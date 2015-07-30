@@ -9,7 +9,7 @@ U_Q_MIN  = 125
 U_Q_MAX  = 140
 U_Q_STEP = 1
 
-pickled_data_file = os.path.join(os.path.expanduser('~'), 'arrival_times.p')
+pickled_data_file = os.path.join(os.path.abspath(os.path.curdir), 'arrival_times.p')
 
 try:
     (_U_Q_MIN, _U_Q_MAX, _U_Q_STEP, u_q_values, data) = pickle.load(open(pickled_data_file, 'rb'))
@@ -31,6 +31,60 @@ if recompute:
 else:
     (U_Q_MIN, U_Q_MAX, U_Q_STEP) = (_U_Q_MIN, _U_Q_MAX, _U_Q_STEP)
 
+def get_data(u_q):
+    x_cV = data[u_q]['x_cV']
+    yzV  = data[u_q]['yzV']
+    nV   = data[u_q]['nV']
+    z_n  = data[u_q]['z_n']
+
+    x_cV = x_cV[0, :]
+
+    arrival_date  = yzV[:, 0]
+    laying_date   = yzV[:, 0] + yzV[:,1]
+    hatching_date = yzV[:,0] + yzV[:, 1] + z_n
+
+    return (x_cV, arrival_date, laying_date, hatching_date,)
+
+def get_line_data_for_bokeh(u_q):
+    (x_cV, arrival_date, laying_date, hatching_date,) = get_data(u_q)
+
+    return { 'x_cV':            x_cV,
+             'arrival_date':    arrival_date,
+             'laying_date':     laying_date,
+             'hatching_date':   hatching_date,
+           }
+
+def fill_between(x1, y1, x2, y2):
+    """
+    Similar to matplotlib's fill_between. We use this
+    output in bokeh's patch() function.
+    """
+
+    new_x = np.append(x1.tolist(), x2.tolist()[::-1])
+    new_y = np.append(y1.tolist(), y2.tolist()[::-1])
+
+    return (new_x, new_y)
+
+def get_patch_data_for_bokeh(u_q):
+    (x_cV, arrival_date, laying_date, hatching_date,) = get_data(u_q)
+
+    # ax.fill_between(x_cV, x_cV, hatching_date, facecolor='black')
+    (hatching_fill_x, hatching_fill_y) = fill_between(x_cV, x_cV, x_cV, hatching_date)
+
+    # ax.fill_between(x_cV, x_cV, laying_date,   facecolor='0.4')
+    (laying_fill_x, laying_fill_y) = fill_between(x_cV, x_cV, x_cV, laying_date)
+
+    # ax.fill_between(x_cV, laying_date, arrival_date,  facecolor='0.7')
+    (arrival_fill_x, arrival_fill_y) = fill_between(x_cV, laying_date, x_cV, arrival_date)
+
+    return { 'hatching_fill_x': hatching_fill_x,
+             'hatching_fill_y': hatching_fill_y,
+             'laying_fill_x':   laying_fill_x,
+             'laying_fill_y':   laying_fill_y,
+             'arrival_fill_x':  arrival_fill_x,
+             'arrival_fill_y':  arrival_fill_y,
+           }
+
 def plot(u_q):
     """
     fig, ax = plt.subplots(figsize=(4, 3),
@@ -49,16 +103,7 @@ def plot(u_q):
                            subplot_kw={'axisbg':'#EEEEEE',
                                        'axisbelow':True})
 
-    x_cV = data[u_q]['x_cV']
-    yzV  = data[u_q]['yzV']
-    nV   = data[u_q]['nV']
-    z_n  = data[u_q]['z_n']
-
-    x_cV = x_cV[0, :]
-
-    arrival_date  = yzV[:, 0]
-    laying_date   = yzV[:, 0] + yzV[:,1]
-    hatching_date = yzV[:,0] + yzV[:, 1] + z_n
+    (x_cV, arrival_date, laying_date, hatching_date,) = get_data(u_q)
 
     ax.plot(x_cV, x_cV,          color='black')
     ax.plot(x_cV, arrival_date,  linewidth=4, color='purple', label='Arrival time')
